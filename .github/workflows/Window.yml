@@ -7,36 +7,47 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 360
     steps:
-      - name: Cài đặt công cụ kết nối
+      - name: Cài đặt công cụ
         shell: powershell
         run: |
-          # Thiết lập mật khẩu cho user runner
+          # Thiết lập mật khẩu cho user
           net user runneradmin YourPassword123!
-          # Tải ngrok để tạo tunnel (Cần thay token ngrok của bạn)
+          
+          # Tải và giải nén Ngrok
           Invoke-WebRequest https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-windows-amd64.zip -OutFile ngrok.zip
           Expand-Archive ngrok.zip
-          ./ngrok/ngrok.exe authtoken 3FczWk7BOcECgv2dXZDACBH1fdT_5g1WAgJ7GEkraoprSoif2
           
+          # Cấu hình Token (Dán trực tiếp như yêu cầu)
+          ./ngrok/ngrok.exe authtoken 3FczWk7BOcECgv2dXZDACBH1fdT_5g1WAgJ7GEkraoprSoif2
+
       - name: Kích hoạt RDP
         shell: powershell
         run: |
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -value 0
           Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
-          
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -value 1
+
       - name: Khởi chạy Ngrok
         shell: powershell
         run: |
           Start-Process ./ngrok/ngrok.exe -ArgumentList 'tcp 3389'
-          
+
       - name: Lấy thông tin kết nối
         shell: powershell
         run: |
-          Invoke-RestMethod http://localhost:4040/api/tunnels | Select-Object -ExpandProperty tunnels | Select-Object -ExpandProperty public_url
+          Write-Host "Đang đợi Ngrok khởi động..."
+          Start-Sleep -Seconds 10
+          $tunnels = (Invoke-RestMethod http://localhost:4040/api/tunnels).tunnels
+          $url = $tunnels[0].public_url
+          Write-Host "========================================"
           Write-Host "Kết nối qua: mstsc"
-          Write-Host "Đăng nhập với User: runneradmin"
-          Write-Host "Mật khẩu: YourPassword123!"
-          
+          Write-Host "Địa chỉ: $url"
+          Write-Host "User: runneradmin"
+          Write-Host "Pass: YourPassword123!"
+          Write-Host "========================================"
+
       - name: Giữ máy chạy
         shell: powershell
-        run: Start-Sleep -Seconds 21600
-        
+        run: |
+          Write-Host "Máy đang chạy. Đừng đóng tab này!"
+          Start-Sleep -Seconds 21600
