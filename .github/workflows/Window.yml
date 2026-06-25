@@ -1,53 +1,28 @@
-name: Windows RDP
-
-on: workflow_dispatch
-
-jobs:
-  build:
-    runs-on: windows-latest
-    timeout-minutes: 360
-    steps:
-      - name: Cài đặt công cụ
+- name: Khởi chạy Ngrok và lấy thông tin
         shell: powershell
         run: |
-          # Thiết lập mật khẩu cho user
-          net user runneradmin YourPassword123!
-          
-          # Tải và giải nén Ngrok
-          Invoke-WebRequest https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-windows-amd64.zip -OutFile ngrok.zip
-          Expand-Archive ngrok.zip
-          
-          # Cấu hình Token (Dán trực tiếp như yêu cầu)
-          ./ngrok/ngrok.exe authtoken 3FczWk7BOcECgv2dXZDACBH1fdT_5g1WAgJ7GEkraoprSoif2
-
-      - name: Kích hoạt RDP
-        shell: powershell
-        run: |
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -value 0
-          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -value 1
-
-      - name: Khởi chạy Ngrok
-        shell: powershell
-        run: |
+          # Chạy Ngrok ở chế độ nền
           Start-Process ./ngrok/ngrok.exe -ArgumentList 'tcp 3389'
-
-      - name: Lấy thông tin kết nối
-        shell: powershell
-        run: |
-          Write-Host "Đang đợi Ngrok khởi động..."
-          Start-Sleep -Seconds 10
-          $tunnels = (Invoke-RestMethod http://localhost:4040/api/tunnels).tunnels
-          $url = $tunnels[0].public_url
-          Write-Host "========================================"
-          Write-Host "Kết nối qua: mstsc"
-          Write-Host "Địa chỉ: $url"
-          Write-Host "User: runneradmin"
-          Write-Host "Pass: YourPassword123!"
-          Write-Host "========================================"
-
-      - name: Giữ máy chạy
-        shell: powershell
-        run: |
-          Write-Host "Máy đang chạy. Đừng đóng tab này!"
-          Start-Sleep -Seconds 21600
+          
+          # Đợi Ngrok khởi tạo API (thay vì chạy song song, ta đợi ở đây)
+          Write-Host "Đang khởi động Ngrok, vui lòng đợi..."
+          $retry = 0
+          while ($retry -lt 15) {
+            try {
+              $url = (Invoke-RestMethod http://localhost:4040/api/tunnels).tunnels[0].public_url
+              if ($url) {
+                Write-Host "========================================"
+                Write-Host "Kết nối qua: mstsc"
+                Write-Host "Địa chỉ: $url"
+                Write-Host "User: runneradmin"
+                Write-Host "Pass: YourPassword123!"
+                Write-Host "========================================"
+                return
+              }
+            } catch {
+              Start-Sleep -Seconds 3
+              $retry++
+            }
+          }
+          Write-Error "Không thể kết nối tới Ngrok sau nhiều lần thử!"
+          exit 1
