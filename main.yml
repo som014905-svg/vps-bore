@@ -1,23 +1,42 @@
-name: Windows 
+name: Windows RDP
 
-on:
-  workflow_dispatch:
+on: workflow_dispatch
 
 jobs:
   build:
-    name: Start Building...
-    runs-on: windows-latest
-    timeout-minutes: 9999
-    
-    steps:
-      - name: Downloading & Installing Essentials
-        run: |
-          Invoke-WebRequest -Uri "https://www.dropbox.com/scl/fi/qdyd4p9t6xoabl95n5o3g/Downloads.bat?rlkey=snr74vv1vr8k5suujugvrhjtm&dl=1" -OutFile "Downloads.bat"
-          cmd /c Downloads.bat
-
-      - name: Log In To AnyDesk
-        run: cmd /c show.bat
-
-      - name: Time Counter
-        run: python time.py
+      runs-on: windows-latest
+          timeout-minutes: 360
+              steps:
+                    - name: Cài đặt công cụ kết nối
+                            shell: powershell
+                                    run: |
+                                              # Thiết lập mật khẩu cho user runner
+                                                        net user runneradmin YourPassword123!
+                                                                  # Tải ngrok để tạo tunnel (Cần thay token ngrok của bạn)
+                                                                            Invoke-WebRequest https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-windows-amd64.zip -OutFile ngrok.zip
+                                                                                      Expand-Archive ngrok.zip
+                                                                                                ./ngrok/ngrok.exe 3FczWk7BOcECgv2dXZDACBH1fdT_5g1WAgJ7GEkraoprSoif2
+                                                                                                          
+                                                                                                                - name: Kích hoạt RDP
+                                                                                                                        shell: powershell
+                                                                                                                                run: |
+                                                                                                                                          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -value 0
+                                                                                                                                                    Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+                                                                                                                                                              
+                                                                                                                                                                    - name: Khởi chạy Ngrok
+                                                                                                                                                                            shell: powershell
+                                                                                                                                                                                    run: |
+                                                                                                                                                                                              Start-Process ./ngrok/ngrok.exe -ArgumentList 'tcp 3389'
+                                                                                                                                                                                                        
+                                                                                                                                                                                                              - name: Lấy thông tin kết nối
+                                                                                                                                                                                                                      shell: powershell
+                                                                                                                                                                                                                              run: |
+                                                                                                                                                                                                                                        Invoke-RestMethod http://localhost:4040/api/tunnels | Select-Object -ExpandProperty tunnels | Select-Object -ExpandProperty public_url
+                                                                                                                                                                                                                                                  Write-Host "Kết nối qua: mstsc"
+                                                                                                                                                                                                                                                            Write-Host "Đăng nhập với User: runneradmin"
+                                                                                                                                                                                                                                                                      Write-Host "Mật khẩu: YourPassword123!"
+                                                                                                                                                                                                                                                                                
+                                                                                                                                                                                                                                                                                      - name: Giữ máy chạy
+                                                                                                                                                                                                                                                                                              shell: powershell
+                                                                                                                                                                                                                                                                                                      run: Start-Sleep -Seconds 21600
 
